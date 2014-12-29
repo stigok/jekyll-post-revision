@@ -1,112 +1,86 @@
-require 'octopress-date-format'
-require 'time'
+require 'open3'
+
+# Some code is from https://github.com/gjtorikian/jekyll-last-modified-at
 
 module Jekyll
+  module Revision
 
-  class PostFullPath < Generator
-    safe :true
-    priority :high
-
-    # Generate file info for each post and page
-    #  +site+ is the site
-    def generate(site)
-      site.posts.each do |post|
-        base = post.instance_variable_get(:@base)
-        name = post.instance_variable_get(:@name)
-        post.data.merge!({
-          'dir_name' => '_posts',
-          'file_name' => name, 
-          'full_path' => File.join(base, name),
-        })
-      end
-      site.pages.each do |page|
-        base = page.instance_variable_get(:@base)
-        dir = page.instance_variable_get(:@dir)
-        name = page.instance_variable_get(:@name)
-        page.data.merge!({
-          'dir_name' => dir,
-          'file_name' => name, 
-          'full_path' => File.join(base, dir, name)})
-      end
-    end
-  end
-
-  class RevisionTag < Liquid::Tag
-    DEFAULT_LIMIT = 5
-
-    def initialize(name, marker, token)
-      @params = Hash[*marker.split(/(?:: *)|(?:, *)/)]
-      if @params['limit'] != nil
-        /\d*/.match(@params['limit']) do |m|
-          @limit = m[0].to_i
+    class Generator < Jekyll::Generator
+      def generate(site)
+        return if ARGV.include?("--no-revision")
+        %w(posts pages docs_to_write).each do |type|
+          site.send(type).each do |item|
+            item.data['revisions'] = GitLogger.new(site.source, item.path, site.config['revision']).revisions
+          end
         end
-      else
-        @limit = DEFAULT_LIMIT
       end
-      super
-    end
+    end # Revision
 
-    def render(context)
-      site = context.environments.first['site']
-      if site['github_user'] == nil || site['github_repo'] == nil
-        puts 'Uh-oh, site is nil'
-        return ''
+    class GitLogger
+      attr_reader :site_source, :page_path, :config
+
+      def initialize(site_source, page_path, config = {})
+        @site_source = site_source
+        @page_path   = page_path
+        @config      = config || {}
       end
 
-      post = context.environments.first['post']
-      if post == nil
-        post = context.environments.first['page']
-        if post == nil
-          puts 'Uh-oh, post is nil'
-          return ''
+      def revisions
+        return nil unless is_git_repo?
+        logs = Executor.sh('git', 'log', '--pretty=%ci|%an|%s', '--max-count=' + max_count.to_s, relative_path_from_git_dir)
+        logs.lines.map do |line|
+          parts = line.split('|')
+          {"date" => parts[0], "author" => parts[1], "message" => parts[2..-1].join('|')}
         end
       end
 
-      full_path = post['full_path']
-      if full_path == nil
-        puts post['title'] + ' full path is nil'
-        return ''
+      private
+      
+      def max_count
+        config['max_count'] || 5
+      end
+      
+      def is_git_repo?
+        @@is_git_repo ||= begin
+          Dir.chdir(site_source) do
+            Executor.sh("git", "rev-parse", "--is-inside-work-tree").eql? "true"
+          end
+        rescue
+          false
+        end
       end
 
-      if !File.exists?(full_path)
-        puts full_path + ' does not exist'
-        return ''
+      def absolute_path_to_article
+        @article_file_path ||= Jekyll.sanitized_path(site_source, @page_path)
       end
 
-      cmd = 'git log --date=local --pretty="%cd|%s" --max-count=' + @limit.to_s + ' ' + full_path
-      logs = `#{cmd}`
-
-      html = '<ul>'
-      logs.each_line do |line|
-        parts = line.split('|')
-        date, msg = parts[0], parts[1..-1].join('|') # keep origin pileline from logs
-        formatted_date = Octopress::PageDate.format_date(Time.parse(date))
-        html << '<li><strong>' + formatted_date + '</strong><br/>' + msg + '</li>'
-      end
-      html << '</ul>'
-
-      dir_name = post['dir_name']
-      if  dir_name == nil
-        return html
+      def relative_path_from_git_dir
+        @relative_path_from_git_dir ||= Pathname.new(absolute_path_to_article)
+          .relative_path_from(
+            Pathname.new(File.dirname(top_level_git_directory))
+          ).to_s
       end
 
-      cmd = 'git rev-parse --abbrev-ref HEAD'
-      # chop last '\n' of branch name
-      branch = `#{cmd}`.chop
-      if site['source'] != nil
-        # for Octopress sites
-        link = File.join('https://github.com', site['github_user'], site['github_repo'],
-                         'commits', branch, site['source'], post['dir_name'], post['file_name'])
-      else
-        # for Jekyll sites
-        link = File.join('https://github.com', site['github_user'], site['github_repo'],
-                         'commits', branch, post['dir_name'], post['file_name'])
+      def top_level_git_directory
+        @@top_level_git_directory ||= begin
+          Dir.chdir(site_source) do
+            top_level_git_directory = File.join(Executor.sh("git", "rev-parse", "--show-toplevel"), ".git")
+          end
+        rescue
+          ""
+        end
       end
-      html << 'View on <a href=' + link + ' target=_blank>Github</a>'
+    end # GitLogger
+  
+    module Executor
+      def self.sh(*args)
+        Open3.popen2e(*args) do |stdin, stdout_stderr, wait_thr|
+          exit_status = wait_thr.value # wait for it...
+          output = stdout_stderr.read
+          output ? output.strip : nil
+        end
+      end
+    end # Executor
 
-      return html
-    end #render
-  end # RevisionTag
+  end # Revision  
 end # Jekyll
-
-Liquid::Template.register_tag('revision', Jekyll::RevisionTag)
