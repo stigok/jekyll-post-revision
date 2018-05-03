@@ -18,7 +18,7 @@ Put `revision.html` and `recent_updated.html` in `/_include` (for Jekyll) or `/s
 
 Include `revision.html` somewhere in your layout file:
 
-	{% include revision.html %}
+    {% include revision.html %}
 
 It lists the revision history of the current post/page. You may modify `revision.html` to get the presentation you want.
 
@@ -26,7 +26,7 @@ It lists the revision history of the current post/page. You may modify `revision
 
 Include `recent_updated.html` somewhere in your layout file:
 
-	{% include recent_updated.html %}
+    {% include recent_updated.html %}
 
 It lists 10 most recent updated pages and posts in your site. You may modify `recent_updated.html` to get the presentation you want.
 
@@ -34,8 +34,8 @@ It lists 10 most recent updated pages and posts in your site. You may modify `re
 
 Add below configuration into `_config.yaml`:
 
-	revision:
-	  max_count: 5
+    revision:
+      max_count: 5
 
 `max_count` is the maximum number of revisions to show. Default is 5 if not set.
 
@@ -43,4 +43,4 @@ Add below configuration into `_config.yaml`:
 
 On site generation, this plugin executes `git log` for every document to retrieve revision history. It takes time when there are a lot of posts. You may disable this plugin during local preview by passing `-- --no-revision` to jekyll startup command.
 
-	$ jekyll serve -- --no-revision
+    $ jekyll serve -- --no-revision
