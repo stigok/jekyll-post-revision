@@ -4,9 +4,9 @@ Page/post revision history for Jekyll/Octopress site.
 
 Git is the only revision control system currently supported.
 
-This plugin adds a page variable `page.revisions`, which is a list of recent revisions of the post or page. Each revision contains attributes `date`, `author` and `message`. A page variable `page.last_modified_at` is added as well, which equals to `page.revisions[0].date`.
+This plugin adds a page variable `page.revisions`, which is a list of recent revisions of the post. Each revision contains attributes `hash`, `date`, `author` and `message`. A page variable `page.last_modified_at` is added as well, which equals to `page.revisions[0].date`.
 
-The sample template file `revision.html` and `recent_updated.html` shows how to use the variable.
+The sample template file `revision.html` and `recent_updated.html` shows how to use the variables.
 
 ## Usage
 
