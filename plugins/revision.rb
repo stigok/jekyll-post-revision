@@ -36,11 +36,11 @@ module Jekyll
       end
 
       private
-      
+
       def max_count
         config['max_count'] || 5
       end
-      
+
       def is_git_repo?
         @@is_git_repo ||= begin
           Dir.chdir(site_source) do
@@ -72,7 +72,7 @@ module Jekyll
         end
       end
     end # GitLogger
-  
+
     module Executor
       def self.sh(*args)
         Open3.popen2e(*args) do |stdin, stdout_stderr, wait_thr|
@@ -83,5 +83,5 @@ module Jekyll
       end
     end # Executor
 
-  end # Revision  
+  end # Revision
 end # Jekyll
